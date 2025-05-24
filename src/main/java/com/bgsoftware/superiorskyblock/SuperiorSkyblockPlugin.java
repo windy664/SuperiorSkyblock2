@@ -161,10 +161,12 @@ public class SuperiorSkyblockPlugin extends JavaPlugin implements SuperiorSkyblo
         loadingStage = PluginLoadingStage.API_INITIALIZED;
 
         String serverVersion = Bukkit.getVersion();
+        /*
         if (serverVersion.toLowerCase(Locale.ENGLISH).contains("arclight")) {
             Log.error("The plugin does not support this server software: " + serverVersion);
             return;
         }
+        */
 
         loadingStage = PluginLoadingStage.SUPPORTED_SERVER_SOFTWARE;
 
