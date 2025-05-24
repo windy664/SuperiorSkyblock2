@@ -1,45 +1,60 @@
-name: Spigot Plugin CI
+name: Java CI with Shadow Jar
 
 on:
-  # 仅当推送到main分支或创建PR到main时触发
   push:
     branches:
-      - "*"
+    - "*"
   pull_request:
-    branches:
-      - "*"
+    branches: 
+    - "*"
 
 jobs:
-  build-plugin:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      jar-path: ${{ steps.build.outputs.jar-path }}
-    
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Setup JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'gradle'
+    - name: Set up JDK 8
+      uses: actions/setup-java@v3
+      with:
+        java-version: '8'
+        distribution: 'temurin'
+        server-id: bg-software # 配置Maven仓库认证ID
 
-      - name: Grant permissions
-        run: chmod +x gradlew
+    - name: Configure Gradle
+      run: |
+        echo "gradle.user.home=$GITHUB_CACHE_DIR/gradle" >> $GITHUB_ENV
+        mkdir -p $gradle.user.home
 
-      - name: Build and package
-        id: build
-        run: ./gradlew build
-        env:
-          GRADLE_USER_HOME: ~/.gradle
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.gradle.user.home }}
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
 
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          path: build/
-          retention-days: 7
+    - name: Build with Shadow Jar
+      env:
+        BUILD_NUMBER: ${{ github.run_number }}
+        STABLE_BUILD: ${{ github.ref == 'refs/heads/main' && !contains(github.ref, 'pull/') }}
+      run: ./gradlew clean shadowJar -PbuildNumber=$BUILD_NUMBER -PstableBuild=$STABLE_BUILD
+      shell: bash
 
-      - name: Show build info
-        run: echo "Built JAR path is ${{ steps.build.outputs.jar-path }}"
+    - name: Upload Shadow Jar
+      uses: actions/upload-artifact@v3
+      with:
+        name: SuperiorSkyblock-JAR
+        path: |
+          **/*.jar
+          !**/API.jar
+          !**/test-*.jar
+        retention-days: 7
+
+    - name: Deploy to Maven (Optional)
+      if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      run: ./gradlew publish
+      env:
+        MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+        MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
